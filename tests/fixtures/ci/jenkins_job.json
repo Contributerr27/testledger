@@ -1,0 +1,4 @@
+{"builds": [
+ {"number": 12, "timestamp": 1790935200000, "result": "SUCCESS", "actions": [{"lastBuiltRevision": {"SHA1": "abc1234def", "branch": [{"name": "origin/main"}]}}]},
+ {"number": 11, "timestamp": 1790931600000, "result": "UNSTABLE", "actions": [{"lastBuiltRevision": {"SHA1": "abc1234def", "branch": [{"name": "origin/main"}]}}]}
+]}

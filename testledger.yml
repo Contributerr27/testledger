@@ -1,0 +1,23 @@
+# TestLedger configuration for this repository (dogfooding).
+org_name: TestLedger (self)
+window_days: 90
+rates:
+  engineer_hourly_usd: 75
+  ci_minute_usd: 0.008
+  triage_minutes_per_false_alarm: 18
+  maintenance_minutes_per_line: 1.5
+  regression_value_usd: 2000
+thresholds:
+  quarantine_flake_rate: 0.30
+  fix_flake_rate: 0.10
+  slow_test_seconds: 60
+  min_executions_for_verdict: 5
+  asset_roi: 0.5
+  demote_layer_cost_ratio: 3.0
+  retire_min_cost_usd: 25
+  ai_min_mutation_score: 0.5
+  ai_min_assertion_density: 0.8
+sources:
+  junit_globs: ["ci-reports/**/TEST-*.xml"]
+  cucumber_globs: []
+  git_repo: "."

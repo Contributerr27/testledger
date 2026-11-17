@@ -1,0 +1,78 @@
+# Quality Investment Memo — {{ s.org }}
+
+**Period:** last {{ s.window_days }} days · **Generated:** {{ s.generated_at }} · **Runs analysed:** {{ s.runs_analysed }} · **Tests on the books:** {{ s.tests }}
+
+## 1. Bottom line
+
+| | USD |
+|---|---:|
+| Carrying cost of the test estate (CI, reruns, triage, maintenance) | {{ "%.2f"|format(s.total_cost_usd) }} |
+| Value delivered (regressions caught × cost of a production defect) | {{ "%.2f"|format(s.total_value_usd) }} |
+| **Net** | **{{ "%.2f"|format(s.net_usd) }}** |
+| Portfolio ROI | {{ s.portfolio_roi if s.portfolio_roi is not none else "n/a" }} |
+
+{{ s.regressions_caught }} regression(s) were caught before production in the window.
+{{ s.asset_tests }} tests are net assets; {{ s.liability_tests }} are net liabilities.
+
+## 2. Recommended reallocation
+
+| Action | Tests | Annualised impact |
+|---|---:|---:|
+| Retire / quarantine | {{ s.verdicts.get('retire', 0) + s.verdicts.get('quarantine', 0) }} | save ≈ ${{ "%.0f"|format(s.annualised_writeoff_savings_usd) }} |
+| Demote UI tests to service/unit layer | {{ s.verdicts.get('demote', 0) }} | save ≈ ${{ "%.0f"|format(s.annualised_demote_savings_usd) }} |
+| Fix (flaky or slow but valuable) | {{ s.verdicts.get('fix', 0) }} | protects value already being delivered |
+| Keep as assets | {{ s.verdicts.get('asset', 0) }} | — |
+| Hold (insufficient evidence) | {{ s.verdicts.get('hold', 0) }} | re-evaluate next quarter |
+
+## 3. Where the money goes
+
+| Cost category | USD |
+|---|---:|
+{% for k, v in inc.costs.items() -%}
+| {{ k.replace('_', ' ') }} | {{ "%.2f"|format(v) }} |
+{% endfor %}
+
+| By layer | Tests | Cost | Value | Regressions |
+|---|---:|---:|---:|---:|
+{% for layer, b in bs.by_layer.items() -%}
+| {{ layer }} | {{ b.tests }} | {{ "%.2f"|format(b.cost_usd) }} | {{ "%.2f"|format(b.value_usd) }} | {{ b.regressions }} |
+{% endfor %}
+
+## 4. Top liabilities (act on these first)
+
+| Test | Layer | Flake | Avg s | Cost | Value | Verdict |
+|---|---|---:|---:|---:|---:|---|
+{% for a in top_liabilities -%}
+| `{{ a.test_id }}` | {{ a.layer }} | {{ "%.0f"|format(a.flake_rate*100) }}% | {{ "%.1f"|format(a.avg_duration_s) }} | {{ "%.2f"|format(a.cost_usd) }} | {{ "%.2f"|format(a.value_usd) }} | **{{ a.verdict }}** |
+{% endfor %}
+
+## 5. Top assets (protect these)
+
+| Test | Layer | Regressions caught | Cost | Value |
+|---|---|---:|---:|---:|
+{% for a in top_assets -%}
+| `{{ a.test_id }}` | {{ a.layer }} | {{ a.regressions_caught }} | {{ "%.2f"|format(a.cost_usd) }} | {{ "%.2f"|format(a.value_usd) }} |
+{% endfor %}
+
+{% if s.ai_generated_tests %}
+## 6. AI-generated test governance
+
+{{ s.ai_generated_tests }} tests are marked AI-generated; {{ s.ai_unverified_liabilities }} fall below the governance thresholds (mutation score ≥ {{ assumptions.thresholds.ai_min_mutation_score }}, assertion density ≥ {{ assumptions.thresholds.ai_min_assertion_density }}). These are **unverified liabilities**: they add carrying cost without evidence they would fail on a real defect.
+
+| Test | Mutation score | Assertion density | Cost |
+|---|---:|---:|---:|
+{% for a in ai -%}
+| `{{ a.test_id }}` | {{ a.mutation_score if a.mutation_score is not none else "n/a" }} | {{ a.assertion_density if a.assertion_density is not none else "n/a" }} | {{ "%.2f"|format(a.cost_usd) }} |
+{% endfor %}
+{% endif %}
+
+## 7. Assumptions (challenge these)
+
+{% for k, v in assumptions.items() if k != 'thresholds' -%}
+- {{ k.replace('_', ' ') }}: {{ v }}
+{% endfor %}
+{% for n in notes -%}
+- {{ n }}
+{% endfor %}
+
+*Method: every test is booked like an account. Debits are CI minutes, rerun minutes, engineer triage time on flaky failures and maintenance churn from git history. Credits are genuine first-attempt failures followed within 3 days by a product fix commit, valued at the organisation's cost of a production defect. Full method: docs/methodology.md.*

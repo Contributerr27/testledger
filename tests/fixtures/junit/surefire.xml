@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="com.acme.unit.PriceCalculatorTest" tests="2" failures="1">
+    <testcase classname="com.acme.unit.PriceCalculatorTest" name="applies_discount" file="src/test/java/com/acme/unit/PriceCalculatorTest.java" time="0.053">
+      <failure message="AssertionError: expected &lt;200&gt; but was &lt;500&gt;"/>
+    </testcase>
+    <testcase classname="com.acme.unit.PriceCalculatorTest" name="rejects_negative" file="src/test/java/com/acme/unit/PriceCalculatorTest.java" time="0.033">
+    </testcase>
+  </testsuite>
+  <testsuite name="com.acme.unit.TaxRulesTest" tests="1" failures="0">
+    <testcase classname="com.acme.unit.TaxRulesTest" name="vat_rounding" file="src/test/java/com/acme/unit/TaxRulesTest.java" time="0.056">
+    </testcase>
+  </testsuite>
+  <testsuite name="com.acme.api.OrderServiceIT" tests="2" failures="0">
+    <testcase classname="com.acme.api.OrderServiceIT" name="creates_order" file="src/test/java/com/acme/api/OrderServiceIT.java" time="2.734">
+    </testcase>
+    <testcase classname="com.acme.api.OrderServiceIT" name="rejects_oos_item" file="src/test/java/com/acme/api/OrderServiceIT.java" time="1.932">
+    </testcase>
+  </testsuite>
+  <testsuite name="com.acme.api.InventoryContractIT" tests="1" failures="0">
+    <testcase classname="com.acme.api.InventoryContractIT" name="schema_v2" file="src/test/java/com/acme/api/InventoryContractIT.java" time="1.734">
+    </testcase>
+  </testsuite>
+  <testsuite name="com.acme.ui.CheckoutSeleniumTest" tests="2" failures="1">
+    <testcase classname="com.acme.ui.CheckoutSeleniumTest" name="full_checkout_chrome" file="src/test/java/com/acme/ui/CheckoutSeleniumTest.java" time="87.235">
+    </testcase>
+    <testcase classname="com.acme.ui.CheckoutSeleniumTest" name="apply_coupon" file="src/test/java/com/acme/ui/CheckoutSeleniumTest.java" time="59.564">
+      <failure message="AssertionError: expected &lt;200&gt; but was &lt;500&gt;"/>
+    </testcase>
+  </testsuite>
+  <testsuite name="com.acme.ui.LoginSeleniumTest" tests="2" failures="0">
+    <testcase classname="com.acme.ui.LoginSeleniumTest" name="valid_login" file="src/test/java/com/acme/ui/LoginSeleniumTest.java" time="47.046">
+    </testcase>
+    <testcase classname="com.acme.ui.LoginSeleniumTest" name="remember_me_cookie" file="src/test/java/com/acme/ui/LoginSeleniumTest.java" time="48.767">
+    </testcase>
+  </testsuite>
+  <testsuite name="com.acme.ui.ReportsExportSeleniumTest" tests="1" failures="0">
+    <testcase classname="com.acme.ui.ReportsExportSeleniumTest" name="csv_export" file="src/test/java/com/acme/ui/ReportsExportSeleniumTest.java" time="110.446">
+    </testcase>
+  </testsuite>
+  <testsuite name="com.acme.ai.RecommendationServiceTest" tests="1" failures="0">
+    <testcase classname="com.acme.ai.RecommendationServiceTest" name="returns_items" file="src/test/java/com/acme/ai/RecommendationServiceTest.java" time="0.240">
+    </testcase>
+  </testsuite>
+</testsuites>

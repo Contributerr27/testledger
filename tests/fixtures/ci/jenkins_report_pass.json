@@ -1,0 +1,4 @@
+{"suites": [{"name": "com.acme.LoginTest", "cases": [
+ {"className": "com.acme.LoginTest", "name": "validLogin", "status": "PASSED", "duration": 1.1},
+ {"className": "com.acme.LoginTest", "name": "lockedAccount", "status": "FIXED", "duration": 2.9}
+]}]}

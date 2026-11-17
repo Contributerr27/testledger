@@ -1,0 +1,92 @@
+[
+ {
+  "name": "Checkout",
+  "uri": "features/checkout.feature",
+  "elements": [
+   {
+    "id": "checkout;guest-checkout-with-card",
+    "name": "guest checkout with card",
+    "type": "scenario",
+    "tags": [
+     {
+      "name": "@ui"
+     }
+    ],
+    "steps": [
+     {
+      "name": "Given I am on the site",
+      "result": {
+       "status": "passed",
+       "duration": 16523239419
+      }
+     },
+     {
+      "name": "When I complete the flow",
+      "result": {
+       "status": "passed",
+       "duration": 66092957679
+      }
+     }
+    ]
+   },
+   {
+    "id": "checkout;registered-checkout-with-saved-card",
+    "name": "registered checkout with saved card",
+    "type": "scenario",
+    "tags": [
+     {
+      "name": "@ui"
+     }
+    ],
+    "steps": [
+     {
+      "name": "Given I am on the site",
+      "result": {
+       "status": "passed",
+       "duration": 16990115991
+      }
+     },
+     {
+      "name": "When I complete the flow",
+      "result": {
+       "status": "passed",
+       "duration": 67960463966
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Search",
+  "uri": "features/search.feature",
+  "elements": [
+   {
+    "id": "search;search-by-sku",
+    "name": "search by sku",
+    "type": "scenario",
+    "tags": [
+     {
+      "name": "@ui"
+     }
+    ],
+    "steps": [
+     {
+      "name": "Given I am on the site",
+      "result": {
+       "status": "passed",
+       "duration": 5861183518
+      }
+     },
+     {
+      "name": "When I complete the flow",
+      "result": {
+       "status": "passed",
+       "duration": 23444734073
+      }
+     }
+    ]
+   }
+  ]
+ }
+]

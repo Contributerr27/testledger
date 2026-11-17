@@ -1,0 +1,25 @@
+{
+  "org": "Acme Commerce (demo)",
+  "generated_at": "2026-11-17T14:33:36+00:00",
+  "window_days": 90,
+  "runs_analysed": 160,
+  "tests": 15,
+  "total_cost_usd": 1223.54,
+  "total_value_usd": 12000.0,
+  "net_usd": 10776.46,
+  "portfolio_roi": 8.808,
+  "regressions_caught": 6,
+  "asset_tests": 6,
+  "liability_tests": 7,
+  "verdicts": {
+    "asset": 4,
+    "hold": 4,
+    "quarantine": 1,
+    "demote": 2,
+    "retire": 4
+  },
+  "annualised_writeoff_savings_usd": 3581.99,
+  "annualised_demote_savings_usd": 857.79,
+  "ai_generated_tests": 1,
+  "ai_unverified_liabilities": 1
+}

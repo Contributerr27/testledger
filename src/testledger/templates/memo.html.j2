@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quality Investment Memo — {{ s.org }}</title>
+<style>
+  :root { --ink:#1b1f24; --muted:#5b6470; --line:#e3e6ea; --asset:#1f7a4d; --liab:#b3261e; --bg:#fafbfc; }
+  body { font: 15px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:var(--ink); background:var(--bg); margin:0; }
+  main { max-width: 980px; margin: 0 auto; padding: 40px 28px 80px; background:#fff; }
+  h1 { font-size: 26px; margin:0 0 4px; } h2 { font-size:18px; margin:32px 0 10px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  .meta { color:var(--muted); font-size:13px; margin-bottom:24px; }
+  .tiles { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin: 18px 0; }
+  .tile { border:1px solid var(--line); border-radius:8px; padding:14px; }
+  .tile .k { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .tile .v { font-size:22px; font-weight:600; margin-top:4px; }
+  .pos { color:var(--asset);} .neg { color:var(--liab);}
+  table { border-collapse: collapse; width:100%; font-size:13.5px; margin: 8px 0 16px; }
+  th, td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  td.num, th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12.5px; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:600; }
+  .retire,.quarantine { background:#fde8e6; color:var(--liab);} .demote,.fix { background:#fff4d6; color:#8a5a00;} .asset { background:#e3f4ea; color:var(--asset);} .hold { background:#eef0f3; color:var(--muted);}
+  .foot { color:var(--muted); font-size:12.5px; margin-top:28px; }
+</style>
+</head>
+<body><main>
+<h1>Quality Investment Memo — {{ s.org }}</h1>
+<div class="meta">Last {{ s.window_days }} days · generated {{ s.generated_at }} · {{ s.runs_analysed }} CI runs · {{ s.tests }} tests on the books</div>
+
+<div class="tiles">
+  <div class="tile"><div class="k">Carrying cost</div><div class="v">${{ "%.0f"|format(s.total_cost_usd) }}</div></div>
+  <div class="tile"><div class="k">Value delivered</div><div class="v">${{ "%.0f"|format(s.total_value_usd) }}</div></div>
+  <div class="tile"><div class="k">Net</div><div class="v {{ 'pos' if s.net_usd >= 0 else 'neg' }}">${{ "%.0f"|format(s.net_usd) }}</div></div>
+  <div class="tile"><div class="k">Regressions caught</div><div class="v">{{ s.regressions_caught }}</div></div>
+</div>
+
+<h2>Recommended reallocation</h2>
+<table>
+<tr><th>Action</th><th class="num">Tests</th><th class="num">Annualised impact</th></tr>
+<tr><td>Retire / quarantine</td><td class="num">{{ s.verdicts.get('retire',0)+s.verdicts.get('quarantine',0) }}</td><td class="num">save ≈ ${{ "%.0f"|format(s.annualised_writeoff_savings_usd) }}</td></tr>
+<tr><td>Demote UI tests to lower layer</td><td class="num">{{ s.verdicts.get('demote',0) }}</td><td class="num">save ≈ ${{ "%.0f"|format(s.annualised_demote_savings_usd) }}</td></tr>
+<tr><td>Fix (flaky / slow but valuable)</td><td class="num">{{ s.verdicts.get('fix',0) }}</td><td class="num">protects delivered value</td></tr>
+<tr><td>Keep as assets</td><td class="num">{{ s.verdicts.get('asset',0) }}</td><td class="num">—</td></tr>
+<tr><td>Hold</td><td class="num">{{ s.verdicts.get('hold',0) }}</td><td class="num">re-evaluate next quarter</td></tr>
+</table>
+
+<h2>Where the money goes</h2>
+<table><tr><th>Cost category</th><th class="num">USD</th></tr>
+{% for k, v in inc.costs.items() %}<tr><td>{{ k.replace('_',' ') }}</td><td class="num">{{ "%.2f"|format(v) }}</td></tr>{% endfor %}
+</table>
+<table><tr><th>Layer</th><th class="num">Tests</th><th class="num">Cost</th><th class="num">Value</th><th class="num">Regressions</th></tr>
+{% for layer, b in bs.by_layer.items() %}<tr><td>{{ layer }}</td><td class="num">{{ b.tests }}</td><td class="num">{{ "%.2f"|format(b.cost_usd) }}</td><td class="num">{{ "%.2f"|format(b.value_usd) }}</td><td class="num">{{ b.regressions }}</td></tr>{% endfor %}
+</table>
+
+<h2>Write-off list</h2>
+<table><tr><th>Test</th><th>Layer</th><th class="num">Flake</th><th class="num">Avg s</th><th class="num">Cost</th><th class="num">Value</th><th>Verdict</th><th>Action</th></tr>
+{% for a in writeoffs %}<tr><td><code>{{ a.test_id }}</code></td><td>{{ a.layer }}</td><td class="num">{{ "%.0f"|format(a.flake_rate*100) }}%</td><td class="num">{{ "%.1f"|format(a.avg_duration_s) }}</td><td class="num">{{ "%.2f"|format(a.cost_usd) }}</td><td class="num">{{ "%.2f"|format(a.value_usd) }}</td><td><span class="badge {{ a.verdict }}">{{ a.verdict }}</span></td><td>{{ a.action }}</td></tr>{% endfor %}
+</table>
+
+<h2>Top assets</h2>
+<table><tr><th>Test</th><th>Layer</th><th class="num">Regressions</th><th class="num">Cost</th><th class="num">Value</th></tr>
+{% for a in top_assets %}<tr><td><code>{{ a.test_id }}</code></td><td>{{ a.layer }}</td><td class="num">{{ a.regressions_caught }}</td><td class="num">{{ "%.2f"|format(a.cost_usd) }}</td><td class="num">{{ "%.2f"|format(a.value_usd) }}</td></tr>{% endfor %}
+</table>
+
+{% if s.ai_generated_tests %}
+<h2>AI-generated test governance</h2>
+<p>{{ s.ai_generated_tests }} AI-generated tests; {{ s.ai_unverified_liabilities }} below governance thresholds (mutation ≥ {{ assumptions.thresholds.ai_min_mutation_score }}, assertion density ≥ {{ assumptions.thresholds.ai_min_assertion_density }}).</p>
+<table><tr><th>Test</th><th class="num">Mutation</th><th class="num">Assertion density</th><th class="num">Cost</th></tr>
+{% for a in ai %}<tr><td><code>{{ a.test_id }}</code></td><td class="num">{{ a.mutation_score if a.mutation_score is not none else "n/a" }}</td><td class="num">{{ a.assertion_density if a.assertion_density is not none else "n/a" }}</td><td class="num">{{ "%.2f"|format(a.cost_usd) }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+
+<h2>Assumptions</h2>
+<table>{% for k, v in assumptions.items() if k != 'thresholds' %}<tr><td>{{ k.replace('_',' ') }}</td><td class="num">{{ v }}</td></tr>{% endfor %}</table>
+<div class="foot">{% for n in notes %}{{ n }}<br>{% endfor %}Generated by TestLedger · github.com/surkuar/testledger</div>
+</main></body></html>

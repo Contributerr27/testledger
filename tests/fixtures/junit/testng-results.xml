@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testng-results skipped="1" failed="1" total="3" passed="1">
+  <suite name="Regression" duration-ms="4210">
+    <test name="Smoke">
+      <class name="com.acme.LoginTest">
+        <test-method status="PASS" signature="setUp()" name="setUp" is-config="true" duration-ms="10"/>
+        <test-method status="PASS" signature="validLogin()" name="validLogin" duration-ms="1200"/>
+        <test-method status="FAIL" signature="lockedAccount()" name="lockedAccount" duration-ms="3000">
+          <exception class="java.lang.AssertionError"><message><![CDATA[expected locked banner]]></message></exception>
+        </test-method>
+        <test-method status="SKIP" signature="sso()" name="sso" duration-ms="0"/>
+      </class>
+    </test>
+  </suite>
+</testng-results>

@@ -1,0 +1,262 @@
+"""TestLedger command-line interface.
+
+testledger init                      # write a starter testledger.yml
+testledger analyze --out reports/    # ingest, book, report
+testledger memo reports/             # print the memo to the terminal
+testledger pr-comment reports/       # emit a Markdown comment for a PR
+"""
+
+from __future__ import annotations
+
+import glob
+import json
+import re
+from datetime import UTC, datetime
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from testledger import __version__
+from testledger.aitest import attach_mutation_scores, load_mutation_report, scan_sources
+from testledger.config import Config
+from testledger.ingest import collect_churn, collect_fix_commits, parse_cucumber_json, parse_junit_xml
+from testledger.ingest.gitlog import default_since
+from testledger.ledger import build_ledger
+from testledger.models import TestRun
+from testledger.reports import build_reports, write_reports
+
+app = typer.Typer(
+    add_completion=False, help="TestLedger — Test Estate Balance Sheet.", invoke_without_command=True
+)
+console = Console()
+
+RUN_META = re.compile(r"(?P<sha>[0-9a-f]{7,40})[-_](?:attempt|run|a)(?P<attempt>\d+)$", re.IGNORECASE)
+RUN_DATE = re.compile(
+    r"^(?P<y>20\d{2})-?(?P<m>\d{2})-?(?P<d>\d{2})(?:T(?P<H>\d{2}):?(?P<M>\d{2}))?(?=[-_.]|$)"
+)
+
+
+def _meta_from_path(p: Path) -> tuple[str | None, int, datetime | None]:
+    """Convention for local report folders: reports/<YYYYMMDD>[THHMM]-<sha>-attempt<N>/junit.xml.
+
+    Date and SHA are optional; without a date the file's mtime is used, and
+    without a SHA no rerun/flake detection is possible for that run.
+    """
+    sha, attempt, ts = None, 1, None
+    for part in reversed(p.parts[:-1]):
+        m = RUN_META.search(part)
+        if m and sha is None:
+            sha, attempt = m.group("sha"), int(m.group("attempt"))
+        d = RUN_DATE.search(part)
+        if d and ts is None:
+            try:
+                ts = datetime(
+                    int(d["y"]),
+                    int(d["m"]),
+                    int(d["d"]),
+                    int(d["H"] or 0),
+                    int(d["M"] or 0),
+                    tzinfo=UTC,
+                )
+            except ValueError:
+                ts = None
+        if sha and ts:
+            break
+    return sha, attempt, ts
+
+
+def _load_local_runs(cfg: Config, root: Path) -> list[TestRun]:
+    runs: list[TestRun] = []
+    for pattern in cfg.sources.junit_globs:
+        for f in glob.glob(str(root / pattern), recursive=True):
+            sha, attempt, ts = _meta_from_path(Path(f))
+            try:
+                runs.append(
+                    parse_junit_xml(
+                        f, commit_sha=sha, attempt=attempt, started_at=ts, run_id=str(Path(f).parent.name)
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                console.print(f"[yellow]skip {f}: {exc}[/yellow]")
+    for pattern in cfg.sources.cucumber_globs:
+        for f in glob.glob(str(root / pattern), recursive=True):
+            sha, attempt, ts = _meta_from_path(Path(f))
+            try:
+                runs.append(
+                    parse_cucumber_json(
+                        f, commit_sha=sha, attempt=attempt, started_at=ts, run_id=str(Path(f).parent.name)
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                console.print(f"[yellow]skip {f}: {exc}[/yellow]")
+    return runs
+
+
+def _load_ci_runs(cfg: Config, since: datetime) -> list[TestRun]:
+    runs: list[TestRun] = []
+    gh = cfg.sources.github
+    if gh and gh.get("repo"):
+        from testledger.ingest.github_actions import fetch_runs
+
+        console.print(f"Fetching GitHub Actions runs for {gh['repo']} …")
+        runs += fetch_runs(
+            gh["repo"],
+            workflow=gh.get("workflow"),
+            since=since,
+            token_env=gh.get("token_env", "GITHUB_TOKEN"),
+            max_runs=int(gh.get("max_runs", 200)),
+            artifact_name_contains=gh.get("artifact_name_contains", "test"),
+        )
+    jk = cfg.sources.jenkins
+    if jk and jk.get("url") and jk.get("job"):
+        from testledger.ingest.jenkins import fetch_builds
+
+        console.print(f"Fetching Jenkins builds for {jk['job']} …")
+        runs += fetch_builds(
+            jk["url"],
+            jk["job"],
+            since=since,
+            user_env=jk.get("user_env", "JENKINS_USER"),
+            token_env=jk.get("token_env", "JENKINS_TOKEN"),
+            max_builds=int(jk.get("max_builds", 100)),
+        )
+    return runs
+
+
+@app.callback()
+def _root(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", "-V", help="Show version and exit"),
+) -> None:
+    if version:
+        console.print(f"testledger {__version__}")
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit()
+
+
+@app.command()
+def init(
+    path: Path = typer.Option(Path("testledger.yml"), "--path", help="Where to write the config"),
+) -> None:
+    """Write a starter testledger.yml with documented defaults."""
+    if path.exists():
+        console.print(f"[red]{path} already exists[/red]")
+        raise typer.Exit(1)
+    path.write_text(Config().dump_example(), encoding="utf-8")
+    console.print(f"Wrote {path}. Edit rates and sources, then run: testledger analyze")
+
+
+@app.command()
+def analyze(
+    config: Path | None = typer.Option(None, "--config", "-c", help="testledger.yml (defaults if omitted)"),
+    reports_root: Path = typer.Option(
+        Path("."), "--reports", "-r", help="Folder searched for local JUnit/Cucumber reports"
+    ),
+    out: Path = typer.Option(Path("testledger-out"), "--out", "-o", help="Output folder"),
+    mutation_report: Path | None = typer.Option(
+        None, "--mutation", help="PIT XML / Stryker JSON / {file: score} JSON"
+    ),
+    skip_ci: bool = typer.Option(False, "--skip-ci", help="Do not call GitHub/Jenkins APIs"),
+    skip_git: bool = typer.Option(False, "--skip-git", help="Do not run git for churn/fix analysis"),
+    fail_on_quarantine: bool = typer.Option(
+        False, "--fail-on-quarantine", help="Exit 2 if any test is quarantine-grade"
+    ),
+) -> None:
+    """Ingest test results + git history, book the ledger, write reports."""
+    cfg = Config.load(config) if config else Config()
+    now = datetime.now(tz=UTC)
+    since = default_since(cfg.window_days)
+
+    runs = _load_local_runs(cfg, reports_root)
+    if not skip_ci:
+        runs += _load_ci_runs(cfg, since)
+    if not runs:
+        console.print(
+            "[red]No test runs found. Point --reports at JUnit/Cucumber output or configure sources.github / sources.jenkins.[/red]"
+        )
+        raise typer.Exit(1)
+
+    churn, fixes, ai_signals = {}, [], {}
+    repo = cfg.sources.git_repo
+    if repo and not skip_git:
+        churn = collect_churn(repo, since)
+        fixes = collect_fix_commits(repo, since)
+        ai_signals = scan_sources(repo, cfg.ai_generated_markers)
+        if mutation_report:
+            attach_mutation_scores(ai_signals, load_mutation_report(mutation_report))
+
+    ledger = build_ledger(runs, cfg, churn=churn, fixes=fixes, ai_signals=ai_signals, now=now)
+    bundle = build_reports(ledger, cfg)
+    written = write_reports(bundle, out)
+    _print_summary(bundle.summary)
+    console.print(f"\nReports written to [bold]{out}[/bold]: " + ", ".join(written))
+    if fail_on_quarantine and bundle.summary["verdicts"].get("quarantine"):
+        raise typer.Exit(2)
+
+
+def _print_summary(s: dict) -> None:
+    t = Table(title=f"TestLedger — {s['org']} (last {s['window_days']} days)")
+    t.add_column("Metric")
+    t.add_column("Value", justify="right")
+    for k in (
+        "runs_analysed",
+        "tests",
+        "total_cost_usd",
+        "total_value_usd",
+        "net_usd",
+        "portfolio_roi",
+        "regressions_caught",
+        "annualised_writeoff_savings_usd",
+        "annualised_demote_savings_usd",
+        "ai_unverified_liabilities",
+    ):
+        t.add_row(k.replace("_", " "), str(s.get(k)))
+    for v, n in sorted(s["verdicts"].items()):
+        t.add_row(f"verdict: {v}", str(n))
+    console.print(t)
+
+
+@app.command()
+def memo(out: Path = typer.Argument(Path("testledger-out"), help="Output folder from `analyze`")) -> None:
+    """Print the Quality Investment Memo (Markdown)."""
+    p = out / "memo.md"
+    if not p.exists():
+        console.print(f"[red]{p} not found — run `testledger analyze` first[/red]")
+        raise typer.Exit(1)
+    console.print(p.read_text(encoding="utf-8"))
+
+
+@app.command("pr-comment")
+def pr_comment(
+    out: Path = typer.Argument(Path("testledger-out")),
+    max_rows: int = typer.Option(10, help="Rows in the write-off table"),
+) -> None:
+    """Emit a compact Markdown comment for pull requests / Slack."""
+    s = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    w = json.loads((out / "writeoffs.json").read_text(encoding="utf-8"))[:max_rows]
+    lines = [
+        "### 📒 TestLedger — Test Estate Balance Sheet",
+        f"**Net:** ${s['net_usd']:,.0f} on ${s['total_cost_usd']:,.0f} carrying cost · ROI {s['portfolio_roi']} · {s['regressions_caught']} regressions caught in {s['window_days']} days",
+        f"Annualised savings available: **${s['annualised_writeoff_savings_usd'] + s['annualised_demote_savings_usd']:,.0f}** "
+        f"({s['verdicts'].get('retire', 0) + s['verdicts'].get('quarantine', 0)} retire/quarantine, {s['verdicts'].get('demote', 0)} demote)",
+        "",
+        "| Test | Verdict | Flake | Cost | Value |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for a in w:
+        lines.append(
+            f"| `{a['test_id']}` | {a['verdict']} | {a['flake_rate'] * 100:.0f}% | ${a['cost_usd']:.2f} | ${a['value_usd']:.2f} |"
+        )
+    if s.get("ai_unverified_liabilities"):
+        lines.append(
+            f"\n⚠️ {s['ai_unverified_liabilities']} AI-generated tests are below governance thresholds (see `ai_liabilities.json`)."
+        )
+    typer.echo("\n".join(lines))
+
+
+if __name__ == "__main__":
+    app()

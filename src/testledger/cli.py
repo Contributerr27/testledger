@@ -4,6 +4,7 @@ testledger init                      # write a starter testledger.yml
 testledger analyze --out reports/    # ingest, book, report
 testledger memo reports/             # print the memo to the terminal
 testledger pr-comment reports/       # emit a Markdown comment for a PR
+testledger diff old.json new.json    # compare two saved ledger reports
 """
 
 from __future__ import annotations
@@ -16,8 +17,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
+from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 from testledger import __version__
 from testledger.aitest import attach_mutation_scores, load_mutation_report, scan_sources
@@ -27,6 +30,7 @@ from testledger.ingest.gitlog import default_since
 from testledger.ledger import build_ledger
 from testledger.models import TestRun
 from testledger.reports import build_reports, write_reports
+from testledger.reports.diff import Snapshot, compare_ledgers, diff_markdown, diff_tables
 
 app = typer.Typer(
     add_completion=False, help="TestLedger — Test Estate Balance Sheet.", invoke_without_command=True
@@ -232,6 +236,43 @@ def _print_summary(s: dict) -> None:
     for v, n in sorted(s["verdicts"].items()):
         t.add_row(f"verdict: {v}", str(n))
     console.print(t)
+
+
+def _read_ledger_snapshot(path: Path) -> Snapshot:
+    try:
+        return Snapshot.read(path)
+    except UnicodeDecodeError as exc:
+        raise typer.BadParameter(f"Save {path} as UTF-8 JSON and retry.") from exc
+    except OSError as exc:
+        raise typer.BadParameter(f"Could not read {path}: {exc.strerror}") from exc
+    except ValidationError as exc:
+        problem = exc.errors(include_input=False)[0]["msg"]
+        raise typer.BadParameter(f"Invalid ledger at {path}: {problem}") from exc
+
+
+@app.command()
+def diff(
+    old: Path = typer.Argument(..., exists=True, dir_okay=False, help="Previous ledger.json"),
+    new: Path = typer.Argument(..., exists=True, dir_okay=False, help="Current ledger.json"),
+    out: Path | None = typer.Option(None, "--out", help="Write the comparison as Markdown"),
+    json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Compare two saved ledger reports."""
+    report = compare_ledgers(_read_ledger_snapshot(old), _read_ledger_snapshot(new))
+    if out is not None:
+        if out.resolve() in {old.resolve(), new.resolve()}:
+            raise typer.BadParameter("Choose an output path different from either ledger.json input.")
+        out.write_text(diff_markdown(report), encoding="utf-8")
+    if json_output:
+        typer.echo(json.dumps(report, indent=2))
+        return
+    for title, headers, rows in diff_tables(report):
+        table = Table(*headers, title=title)
+        for row in rows:
+            table.add_row(*(Text(cell) for cell in row))
+        if not rows:
+            table.add_row("None")
+        console.print(table)
 
 
 @app.command()

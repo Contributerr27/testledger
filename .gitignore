@@ -13,6 +13,6 @@ venv/
 demo-estate/
 testledger-out/
 ci-reports/
-reports/
+/reports/
 .DS_Store
 Thumbs.db

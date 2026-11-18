@@ -16,3 +16,4 @@ ci-reports/
 /reports/
 .DS_Store
 Thumbs.db
+/.idea/

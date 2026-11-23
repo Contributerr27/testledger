@@ -1,0 +1,8 @@
+<test-run start-time="2026-11-20T12:00:00Z"><test-suite>
+<test-case fullname="Shop.Tests.pass(1)" classname="Shop.Tests" name="pass(1)" result="Passed" duration="0.25" />
+<test-case fullname="Shop.Tests.fail" classname="Shop.Tests" name="fail" result="Failed" duration="1.5"><failure><message>expected true</message></failure></test-case>
+<test-case fullname="Shop.Tests.error" classname="Shop.Tests" name="error" result="Failed" label="Error"><failure><message>connection failed</message></failure></test-case>
+<test-case fullname="Shop.Tests.skip" classname="Shop.Tests" name="skip" result="Skipped" />
+<test-case fullname="Shop.Tests.ignore" classname="Shop.Tests" name="ignore" result="Ignored" />
+<test-case fullname="Shop.Tests.unknown" classname="Shop.Tests" name="unknown" result="Inconclusive" />
+</test-suite></test-run>

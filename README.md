@@ -77,7 +77,7 @@ When you use the GitHub Actions or Jenkins ingesters this metadata comes from th
 | Allure results (JUnit 5, TestNG, pytest, Playwright, …) | `sources.allure_globs` | one `allure-results/` folder = one run; retries (same `historyId`) = reruns |
 | Git history | `sources.git_repo` | maintenance churn on test files; fix-commit detection for value credit |
 | GitHub Actions | `sources.github` | run history + artifacts via REST API, `run_attempt` = rerun |
-| GitLab CI | `sources.gitlab` | pipeline test reports; repeated SHA counts as a rerun; supports self-hosted URLs |
+| GitLab CI | `sources.gitlab` | finished pipelines' test reports (newest `max_pipelines`); same SHA + ref + source = rerun; job retries inside one pipeline and child pipelines are not seen; supports self-hosted URLs |
 | Jenkins | `sources.jenkins` | build history + `testReport` JSON; same SHA in consecutive builds = rerun |
 | Mutation reports | `--mutation` | PIT XML, Stryker JSON, or `{file: score}` JSON |
 
